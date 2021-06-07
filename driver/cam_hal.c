@@ -95,7 +95,7 @@ static void cam_task(void *arg)
     int frame_pos = 0;
     cam_obj->state = CAM_STATE_IDLE;
     cam_event_t cam_event = 0;
-    
+
     xQueueReset(cam_obj->event_queue);
 
     while (1) {
@@ -117,7 +117,7 @@ static void cam_task(void *arg)
 
             case CAM_STATE_READ_BUF: {
                 camera_fb_t * frame_buffer_event = &cam_obj->frames[frame_pos].fb;
-                
+
                 if (cam_event == CAM_IN_SUC_EOF_EVENT) {
                     if(!cam_obj->psram_mode){
                         if (cam_obj->recv_size < (frame_buffer_event->len + (cam_obj->dma_half_buffer_size / cam_obj->dma_bytes_per_item))) {
@@ -127,8 +127,8 @@ static void cam_task(void *arg)
                             continue;
                         }
                         frame_buffer_event->len += ll_cam_memcpy(
-                            &frame_buffer_event->buf[frame_buffer_event->len], 
-                            &cam_obj->dma_buffer[(cnt % cam_obj->dma_half_buffer_cnt) * cam_obj->dma_half_buffer_size], 
+                            &frame_buffer_event->buf[frame_buffer_event->len],
+                            &cam_obj->dma_buffer[(cnt % cam_obj->dma_half_buffer_cnt) * cam_obj->dma_half_buffer_size],
                             cam_obj->dma_half_buffer_size);
                     }
                     //Check for JPEG SOI in the first buffer. stop if not found
@@ -151,8 +151,8 @@ static void cam_task(void *arg)
                                     cnt--;
                                 } else {
                                     frame_buffer_event->len += ll_cam_memcpy(
-                                        &frame_buffer_event->buf[frame_buffer_event->len], 
-                                        &cam_obj->dma_buffer[(cnt % cam_obj->dma_half_buffer_cnt) * cam_obj->dma_half_buffer_size], 
+                                        &frame_buffer_event->buf[frame_buffer_event->len],
+                                        &cam_obj->dma_buffer[(cnt % cam_obj->dma_half_buffer_cnt) * cam_obj->dma_half_buffer_size],
                                         cam_obj->dma_half_buffer_size);
                                 }
                             }
@@ -326,7 +326,7 @@ esp_err_t cam_config(const camera_config_t *config, framesize_t frame_size, uint
     } else {
         cam_obj->recv_size = cam_obj->width * cam_obj->height * 2;
     }
-    
+
     ret = cam_dma_config();
     CAM_CHECK_GOTO(ret == ESP_OK, "cam_dma_config failed", err);
 
@@ -343,7 +343,7 @@ esp_err_t cam_config(const camera_config_t *config, framesize_t frame_size, uint
     ret = ll_cam_init_isr(cam_obj);
     CAM_CHECK_GOTO(ret == ESP_OK, "cam intr alloc failed", err);
 
-    
+
 #if CONFIG_CAMERA_CORE0
     xTaskCreatePinnedToCore(cam_task, "cam_task", 2048, NULL, configMAX_PRIORITIES - 2, &cam_obj->task_handle, 0);
 #elif CONFIG_CAMERA_CORE1

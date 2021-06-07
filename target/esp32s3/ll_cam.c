@@ -17,10 +17,16 @@
 #include "soc/system_reg.h"
 #include "soc/lcd_cam_struct.h"
 #include "soc/gdma_struct.h"
+#include "soc/interrupt_core0_reg.h"
 #include "ll_cam.h"
 #include "cam_hal.h"
 
 static const char *TAG = "s3 ll_cam";
+
+#define ETS_LCD_CAM_INTR_SOURCE                 (((INTERRUPT_CORE0_LCD_CAM_INT_MAP_REG - DR_REG_INTERRUPT_CORE0_BASE) / 4))
+#define ETS_DMA_IN_CH0_INTR_SOURCE              (((INTERRUPT_CORE0_DMA_IN_CH0_INT_MAP_REG - DR_REG_INTERRUPT_CORE0_BASE) / 4))
+#define ETS_DMA_OUT_CH0_INTR_SOURCE             (((INTERRUPT_CORE0_DMA_OUT_CH0_INT_MAP_REG - DR_REG_INTERRUPT_CORE0_BASE) / 4))
+
 
 static void IRAM_ATTR ll_cam_vsync_isr(void *arg)
 {
@@ -162,7 +168,7 @@ esp_err_t ll_cam_config(cam_obj_t *cam, const camera_config_t *config)
     }
 
     LCD_CAM.cam_ctrl.val = 0;
-    
+
     LCD_CAM.cam_ctrl.cam_clkm_div_b = 0;
     LCD_CAM.cam_ctrl.cam_clkm_div_a = 0;
     LCD_CAM.cam_ctrl.cam_clkm_div_num = 160000000 / config->xclk_freq_hz;
@@ -196,7 +202,7 @@ esp_err_t ll_cam_config(cam_obj_t *cam, const camera_config_t *config)
     if(err != ESP_OK) {
         return err;
     }
-    
+
     return ESP_OK;
 }
 
@@ -299,7 +305,7 @@ static void ll_cam_calc_rgb_dma(cam_obj_t *cam){
         }
     }
 
-    ESP_LOGI(TAG, "node_size: %4u, nodes_per_line: %u, lines_per_node: %u", 
+    ESP_LOGI(TAG, "node_size: %4u, nodes_per_line: %u, lines_per_node: %u",
             node_size * cam->dma_bytes_per_item, nodes_per_line, lines_per_node);
 
     cam->dma_node_buffer_size = node_size * cam->dma_bytes_per_item;
@@ -332,8 +338,8 @@ static void ll_cam_calc_rgb_dma(cam_obj_t *cam){
     if (!cam->psram_mode) {
         dma_buffer_size =(dma_buffer_max / dma_half_buffer) * dma_half_buffer;
     }
-    
-    ESP_LOGI(TAG, "dma_half_buffer_min: %5u, dma_half_buffer: %5u, lines_per_half_buffer: %2u, dma_buffer_size: %5u", 
+
+    ESP_LOGI(TAG, "dma_half_buffer_min: %5u, dma_half_buffer: %5u, lines_per_half_buffer: %2u, dma_buffer_size: %5u",
             dma_half_buffer_min * cam->dma_bytes_per_item, dma_half_buffer * cam->dma_bytes_per_item, lines_per_half_buffer, dma_buffer_size * cam->dma_bytes_per_item);
 
     cam->dma_buffer_size = dma_buffer_size * cam->dma_bytes_per_item;
@@ -342,7 +348,7 @@ static void ll_cam_calc_rgb_dma(cam_obj_t *cam){
 }
 
 void ll_cam_dma_sizes(cam_obj_t *cam)
-{    
+{
     cam->dma_bytes_per_item = 1;
     if (cam->jpeg_mode) {
         if (cam->psram_mode) {

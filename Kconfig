@@ -1,46 +1,28 @@
 menu "Camera configuration"
 
-    config OV7670_SUPPORT
-        bool "Support OV7670 VGA"
-        default y
-        help
-            Enable this option if you want to use the OV7670.
-            Disable this option to safe memory.
+    choice CAMERA_DEVICE_CHOICE
+        bool "I2C peripheral to use for SCCB"
+        default OV7670_SUPPORT
 
-    config OV7725_SUPPORT
-        bool "Support OV7725 SVGA"
-        default n
-        help
-            Enable this option if you want to use the OV7725.
-            Disable this option to save memory.
+        config OV7670_SUPPORT
+            bool "OV7670 VGA"
+        config OV7725_SUPPORT
+            bool "OV7725 SVGA"
+        config NT99141_SUPPORT
+            bool "NT99141 HD"
+        config OV2640_SUPPORT
+            bool "OV2640 2MP"
+        config OV3660_SUPPORT
+            bool "OV3660 3MP"
+        config OV5640_SUPPORT
+            bool "OV5640 5MP"
+        config GC0328_SUPPORT
+            bool "GC0328"
+    endchoice
 
-    config NT99141_SUPPORT
-        bool "Support NT99141 HD"
+    config SCCB_HARDWARE_INSTALL_I2C_DRIVER
+        bool "Install I2C driver when SCCB init"
         default y
-        help
-            Enable this option if you want to use the NT99141.
-            Disable this option to save memory.
-
-    config OV2640_SUPPORT
-        bool "Support OV2640 2MP"
-        default y
-        help
-            Enable this option if you want to use the OV2640.
-            Disable this option to save memory.
-
-    config OV3660_SUPPORT
-        bool "Support OV3660 3MP"
-        default y
-        help
-            Enable this option if you want to use the OV3360.
-            Disable this option to save memory.
-
-    config OV5640_SUPPORT
-        bool "Support OV5640 5MP"
-        default y
-        help
-            Enable this option if you want to use the OV5640.
-            Disable this option to save memory.
 
     choice SCCB_HARDWARE_I2C_PORT
         bool "I2C peripheral to use for SCCB"

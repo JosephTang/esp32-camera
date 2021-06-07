@@ -11,6 +11,7 @@
 #include <stdint.h>
 int SCCB_Init(int pin_sda, int pin_scl);
 int SCCB_Deinit(void);
+int SCCB_set_port(uint8_t i2c_num); // If i2c driver is installed in other place, this function will set it to SCCB driver.
 uint8_t SCCB_Probe();
 uint8_t SCCB_Read(uint8_t slv_addr, uint8_t reg);
 uint8_t SCCB_Write(uint8_t slv_addr, uint8_t reg, uint8_t data);
