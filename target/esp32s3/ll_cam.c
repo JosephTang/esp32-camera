@@ -23,11 +23,6 @@
 
 static const char *TAG = "s3 ll_cam";
 
-#define ETS_LCD_CAM_INTR_SOURCE                 (((INTERRUPT_CORE0_LCD_CAM_INT_MAP_REG - DR_REG_INTERRUPT_CORE0_BASE) / 4))
-#define ETS_DMA_IN_CH0_INTR_SOURCE              (((INTERRUPT_CORE0_DMA_IN_CH0_INT_MAP_REG - DR_REG_INTERRUPT_CORE0_BASE) / 4))
-#define ETS_DMA_OUT_CH0_INTR_SOURCE             (((INTERRUPT_CORE0_DMA_OUT_CH0_INT_MAP_REG - DR_REG_INTERRUPT_CORE0_BASE) / 4))
-
-
 static void IRAM_ATTR ll_cam_vsync_isr(void *arg)
 {
     //DBG_PIN_SET(1);
