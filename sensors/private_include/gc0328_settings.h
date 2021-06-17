@@ -1,5 +1,6 @@
-#ifndef __SENSOR_CFG_H__
-#define __SENSOR_CFG_H__
+#ifndef __GC0328_SETTINGS_H__
+#define __GC0328_SETTINGS_H__
+
 #include <stdint.h>
 #include <stdbool.h>
 #include "esp_attr.h"

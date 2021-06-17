@@ -49,6 +49,9 @@
 #if CONFIG_GC0328_SUPPORT
 #include "gc0328.h"
 #endif
+#if CONFIG_BF2013_SUPPORT
+#include "bf2013.h"
+#endif
 
 #if defined(ARDUINO_ARCH_ESP32) && defined(CONFIG_ARDUHAL_ESP_LOG)
 #include "esp32-hal-log.h"
@@ -170,7 +173,10 @@ static esp_err_t camera_probe(const camera_config_t *config, camera_model_t *out
 #elif defined(CONFIG_GC0328_SUPPORT)
     if (slv_addr == GC0328_SCCB_ADDR) {
         id->PID = SCCB_Read(slv_addr, 0xF0);
-        // id->PID = 0x9D;
+    }
+#elif defined(CONFIG_BF2013_SUPPORT)
+    if (slv_addr == BF2013_SCCB_ADDR) {
+        id->PID = SCCB_Read(slv_addr, 0xFC);
     }
 #endif
     vTaskDelay(10 / portTICK_PERIOD_MS);
@@ -223,6 +229,12 @@ static esp_err_t camera_probe(const camera_config_t *config, camera_model_t *out
         gc0328_init(&s_state->sensor);
         break;
 #endif
+#if CONFIG_BF2013_SUPPORT
+    case BF2013_PID:
+        *out_camera_model = CAMERA_BF2013;
+        bf2013_init(&s_state->sensor);
+        break;
+#endif
     default:
         id->PID = 0;
         CAMERA_DISABLE_OUT_CLOCK();
@@ -266,6 +278,8 @@ esp_err_t esp_camera_init(const camera_config_t *config)
         ESP_LOGI(TAG, "Detected NT99141 camera");
     } else if (camera_model == CAMERA_GC0328) {
         ESP_LOGI(TAG, "Detected GC0328 camera");
+    } else if (camera_model == CAMERA_BF2013) {
+        ESP_LOGI(TAG, "Detected BF2013 camera");
     } else {
         ESP_LOGI(TAG, "Camera not supported");
         err = ESP_ERR_CAMERA_NOT_SUPPORTED;

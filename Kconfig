@@ -17,7 +17,9 @@ menu "Camera configuration"
         config OV5640_SUPPORT
             bool "OV5640 5MP"
         config GC0328_SUPPORT
-            bool "GC0328"
+            bool "GC0328 VGA"
+        config BF2013_SUPPORT
+            bool "BF2013 VGA"
     endchoice
 
     config SCCB_HARDWARE_INSTALL_I2C_DRIVER

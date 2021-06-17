@@ -28,7 +28,8 @@ typedef enum {
     OV5640_PID = 0x56,
     OV7670_PID = 0x76,
     NT99141_PID = 0x14,
-    GC0328_PID = 0x9D
+    GC0328_PID = 0x9D,
+    BF2013_PID = 0x37,
 } camera_pid_t;
 
 typedef enum {
@@ -39,6 +40,7 @@ typedef enum {
     CAMERA_OV7670,
     CAMERA_NT99141,
     CAMERA_GC0328,
+    CAMERA_BF2013,
     CAMERA_MODEL_MAX,
     CAMERA_NONE,
     CAMERA_UNKNOWN
@@ -52,6 +54,7 @@ typedef enum {
     OV7670_SCCB_ADDR   = 0x21,
     NT99141_SCCB_ADDR  = 0x2A,
     GC0328_SCCB_ADDR   = 0x21,
+    BF2013_SCCB_ADDR   = 0x6E,
 } camera_sccb_addr_t;
 
 typedef enum {
