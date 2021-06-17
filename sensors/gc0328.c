@@ -91,13 +91,12 @@ static int set_pixformat(sensor_t *sensor, pixformat_t pixformat)
             reg = (reg & 0xE0) | 0x06;
             break;
         case PIXFORMAT_YUV422:
-            reg = (reg & 0xE0) | 0x06;
+            reg = (reg & 0xE0) | 0x02;
             break;
         default:
             return -1;
     }
 
-    // Write back register COM7
     ret = SCCB_Write(sensor->slv_addr, 0x44, reg);
 
     // Delay
@@ -117,8 +116,8 @@ static int set_framesize(sensor_t *sensor, framesize_t framesize)
             }
             break;
         case FRAMESIZE_VGA:
-            for (int i = 0; i < sizeof(sensor_framesize_QVGA_regs) / 2; i++) {
-                SCCB_Write(sensor->slv_addr, sensor_framesize_QVGA_regs[i][0], sensor_framesize_QVGA_regs[i][1]);
+            for (int i = 0; i < sizeof(sensor_framesize_VGA_regs) / 2; i++) {
+                SCCB_Write(sensor->slv_addr, sensor_framesize_VGA_regs[i][0], sensor_framesize_VGA_regs[i][1]);
             }
             break;
         default:
@@ -245,7 +244,7 @@ static int set_contrast(sensor_t *sensor, int level)
 
 static int init_status(sensor_t *sensor)
 {
-    reset(sensor);
+    // reset(sensor);
     return 0;
 }
 
