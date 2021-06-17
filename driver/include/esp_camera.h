@@ -115,6 +115,8 @@ typedef struct {
     int jpeg_quality;               /*!< Quality of JPEG output. 0-63 lower means higher quality  */
     size_t fb_count;                /*!< Number of frame buffers to be allocated. If more than one, then each frame will be acquired (double speed)  */
     camera_grab_mode_t grab_mode;   /*!< When buffers should be filled */
+
+    bool psram_mode;                /*!< enable PSRAM mode */
 } camera_config_t;
 
 /**
