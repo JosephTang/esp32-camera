@@ -107,7 +107,8 @@ typedef struct {
     uint32_t frame_cnt;
     uint32_t recv_size;
     bool swap_data;
-    bool psram_mode;
+    cam_receive_mode_t recv_mode;
+    size_t chunk_size;
 
     //for RGB/YUV modes
     uint16_t width;

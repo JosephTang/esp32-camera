@@ -242,7 +242,7 @@ static esp_err_t cam_dma_config()
     CAM_CHECK(cam_obj->frames != NULL, "frames malloc failed", ESP_FAIL);
 
     uint8_t dma_align = 0;
-    if (cam_obj->psram_mode) {
+    if (cam->recv_mode == RECEIVE_FRAME_WITH_PSRAM) {
         dma_align = ll_cam_get_dma_align(cam_obj);
     }
     for (int x = 0; x < cam_obj->frame_cnt; x++) {
@@ -251,7 +251,7 @@ static esp_err_t cam_dma_config()
         cam_obj->frames[x].en = 0;
         cam_obj->frames[x].fb.buf = (uint8_t *)heap_caps_malloc(cam_obj->recv_size * sizeof(uint8_t) + dma_align, MALLOC_CAP_SPIRAM);
         CAM_CHECK(cam_obj->frames[x].fb.buf != NULL, "frame buffer malloc failed", ESP_FAIL);
-        if (cam_obj->psram_mode) {
+        if (cam->recv_mode == RECEIVE_FRAME_WITH_PSRAM) {
             //align PSRAM buffer. TODO: save the offset so proper address can be freed later
             cam_obj->frames[x].fb_offset = dma_align - ((uint32_t)cam_obj->frames[x].fb.buf & (dma_align - 1));
             cam_obj->frames[x].fb.buf += cam_obj->frames[x].fb_offset;
@@ -262,7 +262,7 @@ static esp_err_t cam_dma_config()
         cam_obj->frames[x].en = 1;
     }
 
-    if (!cam_obj->psram_mode) {
+    if (cam->recv_mode != RECEIVE_FRAME_WITH_PSRAM) {
         cam_obj->dma_buffer = (uint8_t *)heap_caps_malloc(cam_obj->dma_buffer_size * sizeof(uint8_t), MALLOC_CAP_DMA);
         CAM_CHECK(cam_obj->dma_buffer != NULL, "dma_buffer malloc failed", ESP_FAIL);
 
@@ -313,11 +313,17 @@ esp_err_t cam_config(const camera_config_t *config, framesize_t frame_size, uint
 
     cam_obj->jpeg_mode = config->pixel_format == PIXFORMAT_JPEG;
 #if CONFIG_IDF_TARGET_ESP32
-    cam_obj->psram_mode = false;
+    cam_obj->recv_mode = RECEIVE_FRAME_WITH_DRAM;
 #else
-    cam_obj->psram_mode = config->psram_mode;
+    cam_obj->recv_mode = config->recv_mode;
 #endif
-    cam_obj->frame_cnt = config->fb_count;
+    cam_obj->chunk_size = config->chunk_size;
+
+    if (cam_obj->recv_mode == RECEIVE_CHUNKED_WITH_DRAM) {
+        cam_obj->frame_cnt = 2;
+    } else {
+        cam_obj->frame_cnt = config->fb_count;
+    }
     cam_obj->width = resolution[frame_size].width;
     cam_obj->height = resolution[frame_size].height;
 
