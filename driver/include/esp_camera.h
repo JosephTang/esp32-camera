@@ -70,6 +70,7 @@
 #include "driver/ledc.h"
 #include "sensor.h"
 #include "sys/time.h"
+#include "ll_cam.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -82,6 +83,15 @@ typedef enum {
     CAMERA_GRAB_WHEN_EMPTY,         /*!< Fills buffers when they are empty. Less resources but first 'fb_count' frames might be old */
     CAMERA_GRAB_LATEST              /*!< Except when 1 frame buffer is used, queue will always contain the last 'fb_count' frames */
 } camera_grab_mode_t;
+
+/**
+ * @brief Receive mode for camera initialization
+ */
+typedef enum {
+    RECEIVE_FRAME_WITH_DRAM,        /*!< use dram as dma buffer, and copy the data to psram*/
+    RECEIVE_FRAME_WITH_PSRAM,       /*!< use psram as dma buffer */
+    RECEIVE_CHUNKED_WITH_DRAM,      /*!< use dram as dma buffer, and throw out the chunked data */
+} cam_receive_mode_t;
 
 /**
  * @brief Configuration structure for camera initialization
@@ -116,7 +126,8 @@ typedef struct {
     size_t fb_count;                /*!< Number of frame buffers to be allocated. If more than one, then each frame will be acquired (double speed)  */
     camera_grab_mode_t grab_mode;   /*!< When buffers should be filled */
 
-    bool psram_mode;                /*!< enable PSRAM mode */
+    cam_receive_mode_t recv_mode;   /*!< receive mode */
+    size_t chunk_size;              /*!< data size for chunked mode */
 } camera_config_t;
 
 /**

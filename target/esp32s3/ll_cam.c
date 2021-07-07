@@ -21,6 +21,10 @@
 #include "ll_cam.h"
 #include "cam_hal.h"
 
+#define ETS_LCD_CAM_INTR_SOURCE                 (((INTERRUPT_CORE0_LCD_CAM_INT_MAP_REG - DR_REG_INTERRUPT_CORE0_BASE) / 4))
+#define ETS_DMA_IN_CH0_INTR_SOURCE              (((INTERRUPT_CORE0_DMA_IN_CH0_INT_MAP_REG - DR_REG_INTERRUPT_CORE0_BASE) / 4))
+#define ETS_DMA_OUT_CH0_INTR_SOURCE             (((INTERRUPT_CORE0_DMA_OUT_CH0_INT_MAP_REG - DR_REG_INTERRUPT_CORE0_BASE) / 4))
+
 static const char *TAG = "s3 ll_cam";
 
 static void IRAM_ATTR ll_cam_vsync_isr(void *arg)
@@ -69,7 +73,7 @@ static void IRAM_ATTR ll_cam_dma_isr(void *arg)
 
 bool ll_cam_stop(cam_obj_t *cam)
 {
-    if (cam->jpeg_mode || !cam->psram_mode) {
+    if (cam->jpeg_mode || cam->recv_mode != RECEIVE_FRAME_WITH_PSRAM) {
         GDMA.in[cam->dma_num].int_ena.in_suc_eof = 0;
         GDMA.in[cam->dma_num].int_clr.in_suc_eof = 1;
     }
@@ -81,7 +85,7 @@ bool ll_cam_start(cam_obj_t *cam, int frame_pos)
 {
     LCD_CAM.cam_ctrl1.cam_start = 0;
 
-    if (cam->jpeg_mode || !cam->psram_mode) {
+    if (cam->jpeg_mode || cam->recv_mode != RECEIVE_FRAME_WITH_PSRAM) {
         GDMA.in[cam->dma_num].int_clr.in_suc_eof = 1;
         GDMA.in[cam->dma_num].int_ena.in_suc_eof = 1;
     }
@@ -95,7 +99,7 @@ bool ll_cam_start(cam_obj_t *cam, int frame_pos)
 
     LCD_CAM.cam_ctrl1.cam_rec_data_bytelen = cam->dma_half_buffer_size - 1; // Ping pong operation
 
-    if (!cam->psram_mode) {
+    if (cam->recv_mode != RECEIVE_FRAME_WITH_PSRAM) {
         GDMA.in[cam->dma_num].link.addr = ((uint32_t)&cam->dma[0]) & 0xfffff;
     } else {
         GDMA.in[cam->dma_num].link.addr = ((uint32_t)&cam->frames[frame_pos].dma[0]) & 0xfffff;
@@ -139,7 +143,7 @@ static esp_err_t ll_cam_dma_init(cam_obj_t *cam)
     GDMA.in[cam->dma_num].conf0.in_rst = 0;
 
     //internal SRAM only
-    if (!cam->psram_mode) {
+    if (cam->recv_mode != RECEIVE_FRAME_WITH_PSRAM) {
         GDMA.in[cam->dma_num].conf0.indscr_burst_en = 1;
         GDMA.in[cam->dma_num].conf0.in_data_burst_en = 1;
     }
@@ -326,11 +330,11 @@ static void ll_cam_calc_rgb_dma(cam_obj_t *cam){
 
     // Calculate DMA size
     size_t dma_buffer_max = 2 * dma_half_buffer_max;
-    if (cam->psram_mode) {
+    if (cam->recv_mode == RECEIVE_FRAME_WITH_PSRAM) {
         dma_buffer_max = cam->recv_size / cam->dma_bytes_per_item;
     }
     size_t dma_buffer_size = dma_buffer_max;
-    if (!cam->psram_mode) {
+    if (cam->recv_mode == RECEIVE_FRAME_WITH_DRAM) {
         dma_buffer_size =(dma_buffer_max / dma_half_buffer) * dma_half_buffer;
     }
 
@@ -346,16 +350,28 @@ void ll_cam_dma_sizes(cam_obj_t *cam)
 {
     cam->dma_bytes_per_item = 1;
     if (cam->jpeg_mode) {
-        if (cam->psram_mode) {
+        if (cam->recv_mode == RECEIVE_FRAME_WITH_PSRAM) {
             cam->dma_buffer_size = cam->recv_size;
             cam->dma_half_buffer_size = 1024;
             cam->dma_half_buffer_cnt = cam->dma_buffer_size / cam->dma_half_buffer_size;
             cam->dma_node_buffer_size = cam->dma_half_buffer_size;
-        } else {
+        } else if (cam->recv_mode == RECEIVE_FRAME_WITH_DRAM) {
             cam->dma_half_buffer_cnt = 16;
             cam->dma_buffer_size = cam->dma_half_buffer_cnt * 1024;
             cam->dma_half_buffer_size = cam->dma_buffer_size / cam->dma_half_buffer_cnt;
             cam->dma_node_buffer_size = cam->dma_half_buffer_size;
+        }
+    } else if (cam->recv_mode == RECEIVE_CHUNKED_WITH_DRAM) {
+        size_t node_max = LCD_CAM_DMA_NODE_BUFFER_MAX_SIZE / cam->dma_bytes_per_item;
+        cam->dma_half_buffer_cnt = 2;
+        cam->dma_half_buffer_size = cam->chunk_size;
+        cam->dma_buffer_size = cam->dma_half_buffer_cnt * cam->dma_half_buffer_size;
+
+        for (; node_max > 0; node_max--) {
+            if ((cam->chuck_size % node_max) == 0) {
+                cam->dma_node_buffer_size = node_max;
+                break;
+            }
         }
     } else {
         ll_cam_calc_rgb_dma(cam);
