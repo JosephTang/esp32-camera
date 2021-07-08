@@ -392,7 +392,7 @@ bool ll_cam_dma_sizes(cam_obj_t *cam)
         cam->dma_buffer_size = cam->dma_half_buffer_cnt * cam->dma_half_buffer_size;
 
         for (; node_max > 0; node_max--) {
-            if ((cam->chuck_size % node_max) == 0) {
+            if ((cam->chunk_size % node_max) == 0) {
                 cam->dma_node_buffer_size = node_max;
                 break;
             }

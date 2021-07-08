@@ -95,6 +95,7 @@ static void cam_task(void *arg)
     int frame_pos = 0;
     cam_obj->state = CAM_STATE_IDLE;
     cam_event_t cam_event = 0;
+    bool first_chunk = true;
 
     xQueueReset(cam_obj->event_queue);
 
@@ -109,6 +110,7 @@ static void cam_task(void *arg)
                     if(cam_start_frame(&frame_pos)){
                         cam_obj->frames[frame_pos].fb.len = 0;
                         cam_obj->state = CAM_STATE_READ_BUF;
+                        first_chunk = true;
                     }
                     cnt = 0;
                 }
@@ -119,7 +121,7 @@ static void cam_task(void *arg)
                 camera_fb_t * frame_buffer_event = &cam_obj->frames[frame_pos].fb;
 
                 if (cam_event == CAM_IN_SUC_EOF_EVENT) {
-                    if(!cam_obj->psram_mode){
+                    if(cam_obj->recv_mode == RECEIVE_FRAME_WITH_DRAM){
                         if (cam_obj->recv_size < (frame_buffer_event->len + (cam_obj->dma_half_buffer_size / cam_obj->dma_bytes_per_item))) {
                             ESP_LOGW(TAG, "FB-OVF");
                             ll_cam_stop(cam_obj);
@@ -137,15 +139,35 @@ static void cam_task(void *arg)
                         cam_obj->state = CAM_STATE_IDLE;
                         ESP_LOGW(TAG, "NO-SOI");
                     }
+
+                    if (cam_obj->recv_mode == RECEIVE_CHUNKED_WITH_DRAM) {
+                        if (cam_obj->frames[frame_pos].en) {
+                            cam_obj->frames[frame_pos].en = 0;
+                            frame_buffer_event->buf = &cam_obj->dma_buffer[(cnt % cam_obj->dma_half_buffer_cnt) * cam_obj->dma_half_buffer_size];
+                            frame_buffer_event->len = cam_obj->dma_half_buffer_size;
+                            frame_buffer_event->first_chunk = first_chunk;
+                            first_chunk = (first_chunk == true) ? !first_chunk : first_chunk;
+                            if (xQueueSend(cam_obj->frame_buffer_queue, (void *)&frame_buffer_event, 0) != pdTRUE) {
+                                cam_obj->frames[frame_pos].en = 1;
+                            } else {
+                                frame_pos = (frame_pos + 1) % cam_obj->frame_cnt;
+                            }
+                        }
+                    }
                     cnt++;
 
                 } else if (cam_event == CAM_VSYNC_EVENT) {
+                    if (cam_obj->recv_mode == RECEIVE_CHUNKED_WITH_DRAM) {
+                        cnt = 0;
+                        // first_chunk = 1;
+                        break;
+                    }
                     //DBG_PIN_SET(1);
                     ll_cam_stop(cam_obj);
 
-                    if (cnt || !cam_obj->jpeg_mode || cam_obj->psram_mode) {
+                    if (cnt || !cam_obj->jpeg_mode || cam_obj->recv_mode == RECEIVE_FRAME_WITH_PSRAM) {
                         if (cam_obj->jpeg_mode) {
-                            if (!cam_obj->psram_mode) {
+                            if (cam_obj->recv_mode == RECEIVE_FRAME_WITH_DRAM) {
                                 if (cam_obj->recv_size < (frame_buffer_event->len + (cam_obj->dma_half_buffer_size / cam_obj->dma_bytes_per_item))) {
                                     ESP_LOGW(TAG, "FB-OVF");
                                     cnt--;
@@ -161,7 +183,7 @@ static void cam_task(void *arg)
 
                         cam_obj->frames[frame_pos].en = 0;
 
-                        if (cam_obj->psram_mode) {
+                        if (cam_obj->recv_mode == RECEIVE_FRAME_WITH_DRAM) {
                             if (cam_obj->jpeg_mode) {
                                 frame_buffer_event->len = cnt * cam_obj->dma_half_buffer_size;
                             } else {
@@ -242,16 +264,18 @@ static esp_err_t cam_dma_config()
     CAM_CHECK(cam_obj->frames != NULL, "frames malloc failed", ESP_FAIL);
 
     uint8_t dma_align = 0;
-    if (cam->recv_mode == RECEIVE_FRAME_WITH_PSRAM) {
+    if (cam_obj->recv_mode == RECEIVE_FRAME_WITH_PSRAM) {
         dma_align = ll_cam_get_dma_align(cam_obj);
     }
     for (int x = 0; x < cam_obj->frame_cnt; x++) {
         cam_obj->frames[x].dma = NULL;
         cam_obj->frames[x].fb_offset = 0;
         cam_obj->frames[x].en = 0;
-        cam_obj->frames[x].fb.buf = (uint8_t *)heap_caps_malloc(cam_obj->recv_size * sizeof(uint8_t) + dma_align, MALLOC_CAP_SPIRAM);
-        CAM_CHECK(cam_obj->frames[x].fb.buf != NULL, "frame buffer malloc failed", ESP_FAIL);
-        if (cam->recv_mode == RECEIVE_FRAME_WITH_PSRAM) {
+        if (cam_obj->recv_mode != RECEIVE_CHUNKED_WITH_DRAM) {
+            cam_obj->frames[x].fb.buf = (uint8_t *)heap_caps_malloc(cam_obj->recv_size * sizeof(uint8_t) + dma_align, MALLOC_CAP_SPIRAM);
+            CAM_CHECK(cam_obj->frames[x].fb.buf != NULL, "frame buffer malloc failed", ESP_FAIL);
+        }
+        if (cam_obj->recv_mode == RECEIVE_FRAME_WITH_PSRAM) {
             //align PSRAM buffer. TODO: save the offset so proper address can be freed later
             cam_obj->frames[x].fb_offset = dma_align - ((uint32_t)cam_obj->frames[x].fb.buf & (dma_align - 1));
             cam_obj->frames[x].fb.buf += cam_obj->frames[x].fb_offset;
@@ -262,7 +286,7 @@ static esp_err_t cam_dma_config()
         cam_obj->frames[x].en = 1;
     }
 
-    if (cam->recv_mode != RECEIVE_FRAME_WITH_PSRAM) {
+    if (cam_obj->recv_mode != RECEIVE_FRAME_WITH_PSRAM) {
         cam_obj->dma_buffer = (uint8_t *)heap_caps_malloc(cam_obj->dma_buffer_size * sizeof(uint8_t), MALLOC_CAP_DMA);
         CAM_CHECK(cam_obj->dma_buffer != NULL, "dma_buffer malloc failed", ESP_FAIL);
 
@@ -336,7 +360,7 @@ esp_err_t cam_config(const camera_config_t *config, framesize_t frame_size, uint
     ret = cam_dma_config();
     CAM_CHECK_GOTO(ret == ESP_OK, "cam_dma_config failed", err);
 
-    cam_obj->event_queue = xQueueCreate(cam_obj->dma_half_buffer_cnt - 1, sizeof(cam_event_t));
+    cam_obj->event_queue = xQueueCreate(cam_obj->dma_half_buffer_cnt + 1, sizeof(cam_event_t));
     CAM_CHECK_GOTO(cam_obj->event_queue != NULL, "event_queue create failed", err);
 
     size_t frame_buffer_queue_len = cam_obj->frame_cnt;
@@ -358,7 +382,7 @@ esp_err_t cam_config(const camera_config_t *config, framesize_t frame_size, uint
     xTaskCreate(cam_task, "cam_task", 2048, NULL, configMAX_PRIORITIES - 2, &cam_obj->task_handle);
 #endif
 
-    ESP_LOGI(TAG, "cam config ok");
+    ESP_LOGI(TAG, "cam works @ mode %d", cam_obj->recv_mode);
     return ESP_OK;
 
 err:
