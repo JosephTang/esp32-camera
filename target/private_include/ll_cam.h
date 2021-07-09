@@ -35,17 +35,12 @@
 #include "freertos/task.h"
 #include "freertos/semphr.h"
 
-#define CAMERA_DBG_PIN_ENABLE 0
+#define CAMERA_DBG_PIN_ENABLE 1
 #if CAMERA_DBG_PIN_ENABLE
-    #if CONFIG_IDF_TARGET_ESP32
-        #define DBG_PIN_NUM 26
-    #else
-        #define DBG_PIN_NUM 7
-    #endif
     #include "hal/gpio_ll.h"
-    #define DBG_PIN_SET(v) gpio_ll_set_level(&GPIO, DBG_PIN_NUM, v)
+    #define DBG_PIN_SET(n, v) gpio_ll_set_level(&GPIO, n, v)
 #else
-    #define DBG_PIN_SET(v)
+    #define DBG_PIN_SET(n, v)
 #endif
 
 #define CAM_CHECK(a, str, ret) if (!(a)) {                                          \
@@ -109,6 +104,7 @@ typedef struct {
     bool swap_data;
     cam_receive_mode_t recv_mode;
     size_t chunk_size;
+    void *jpeg_encoder;
 
     //for RGB/YUV modes
     uint16_t width;

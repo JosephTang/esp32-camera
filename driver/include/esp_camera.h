@@ -70,6 +70,7 @@
 #include "driver/ledc.h"
 #include "sensor.h"
 #include "sys/time.h"
+#include "jpeg_enc.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -89,7 +90,7 @@ typedef enum {
 typedef enum {
     RECEIVE_FRAME_WITH_DRAM,        /*!< use dram as dma buffer, and copy the data to psram*/
     RECEIVE_FRAME_WITH_PSRAM,       /*!< use psram as dma buffer */
-    RECEIVE_CHUNKED_WITH_DRAM,      /*!< use dram as dma buffer, and throw out the chunked data */
+    RECEIVE_CHUNKED_WITH_DRAM,      /*!< use dram as dma buffer, and encode the chunked data with JPEG encoder */
 } cam_receive_mode_t;
 
 /**
@@ -131,7 +132,7 @@ typedef struct {
         TO_YUV420
     } conv_mode;
     cam_receive_mode_t recv_mode;   /*!< receive mode */
-    size_t chunk_size;              /*!< data size for chunked mode */
+    jpeg_enc_info_t *jpeg_enc_cfg;  /*!< configuration for jpeg encoder */
 } camera_config_t;
 
 /**

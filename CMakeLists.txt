@@ -60,4 +60,7 @@ if(IDF_TARGET STREQUAL "esp32" OR IDF_TARGET STREQUAL "esp32s2" OR IDF_TARGET ST
   set(COMPONENT_PRIV_REQUIRES freertos nvs_flash)
 
   register_component()
+
+  target_link_libraries(${COMPONENT_TARGET} INTERFACE "-L${CMAKE_CURRENT_LIST_DIR}/conversions")
+  target_link_libraries(${COMPONENT_TARGET} INTERFACE jpeg_enc)
 endif()
