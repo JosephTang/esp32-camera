@@ -343,6 +343,18 @@ esp_err_t esp_camera_deinit()
     return ret;
 }
 
+esp_err_t esp_camera_pause()
+{
+    cam_stop();
+    return ESP_OK;
+}
+
+esp_err_t esp_camera_resume()
+{
+    cam_start();
+    return ESP_OK;
+}
+
 #define FB_GET_TIMEOUT (4000 / portTICK_PERIOD_MS)
 
 camera_fb_t *esp_camera_fb_get()

@@ -164,6 +164,10 @@ esp_err_t esp_camera_init(const camera_config_t* config);
  */
 esp_err_t esp_camera_deinit();
 
+
+esp_err_t esp_camera_pause();
+esp_err_t esp_camera_resume();
+
 /**
  * @brief Obtain pointer to a frame buffer.
  *
