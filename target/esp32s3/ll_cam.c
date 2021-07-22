@@ -17,7 +17,6 @@
 #include "soc/system_reg.h"
 #include "soc/lcd_cam_struct.h"
 #include "soc/gdma_struct.h"
-#include "soc/interrupt_core0_reg.h"
 #include "ll_cam.h"
 #include "cam_hal.h"
 
@@ -51,12 +50,12 @@ static void IRAM_ATTR ll_cam_dma_isr(void *arg)
     cam_obj_t *cam = (cam_obj_t *)arg;
     BaseType_t HPTaskAwoken = pdFALSE;
 
-    typeof(GDMA.in[cam->dma_num].int_st) status = GDMA.in[cam->dma_num].int_st;
+    typeof(GDMA.channel[cam->dma_num].in.int_st) status = GDMA.channel[cam->dma_num].in.int_st;
     if (status.val == 0) {
         return;
     }
 
-    GDMA.in[cam->dma_num].int_clr.val = status.val;
+    GDMA.channel[cam->dma_num].in.int_clr.val = status.val;
 
     if (status.in_suc_eof) {
         ll_cam_send_event(cam, CAM_IN_SUC_EOF_EVENT, &HPTaskAwoken);
@@ -70,11 +69,26 @@ static void IRAM_ATTR ll_cam_dma_isr(void *arg)
 bool ll_cam_stop(cam_obj_t *cam)
 {
     if (cam->jpeg_mode || !cam->psram_mode) {
-        GDMA.in[cam->dma_num].int_ena.in_suc_eof = 0;
-        GDMA.in[cam->dma_num].int_clr.in_suc_eof = 1;
+        GDMA.channel[cam->dma_num].in.int_ena.in_suc_eof = 0;
+        GDMA.channel[cam->dma_num].in.int_clr.in_suc_eof = 1;
     }
-    GDMA.in[cam->dma_num].link.stop = 1;
+    GDMA.channel[cam->dma_num].in.link.stop = 1;
     return true;
+}
+
+esp_err_t ll_cam_deinit(cam_obj_t *cam)
+{
+    if (cam->cam_intr_handle) {
+        esp_intr_free(cam->cam_intr_handle);
+        cam->cam_intr_handle = NULL;
+    }
+
+    if (cam->dma_intr_handle) {
+        esp_intr_free(cam->dma_intr_handle);
+        cam->dma_intr_handle = NULL;
+    }
+    GDMA.channel[cam->dma_num].in.link.addr = 0x0;
+    return ESP_OK;
 }
 
 bool ll_cam_start(cam_obj_t *cam, int frame_pos)
@@ -82,26 +96,26 @@ bool ll_cam_start(cam_obj_t *cam, int frame_pos)
     LCD_CAM.cam_ctrl1.cam_start = 0;
 
     if (cam->jpeg_mode || !cam->psram_mode) {
-        GDMA.in[cam->dma_num].int_clr.in_suc_eof = 1;
-        GDMA.in[cam->dma_num].int_ena.in_suc_eof = 1;
+        GDMA.channel[cam->dma_num].in.int_clr.in_suc_eof = 1;
+        GDMA.channel[cam->dma_num].in.int_ena.in_suc_eof = 1;
     }
 
     LCD_CAM.cam_ctrl1.cam_reset = 1;
     LCD_CAM.cam_ctrl1.cam_reset = 0;
     LCD_CAM.cam_ctrl1.cam_afifo_reset = 1;
     LCD_CAM.cam_ctrl1.cam_afifo_reset = 0;
-    GDMA.in[cam->dma_num].conf0.in_rst = 1;
-    GDMA.in[cam->dma_num].conf0.in_rst = 0;
+    GDMA.channel[cam->dma_num].in.conf0.in_rst = 1;
+    GDMA.channel[cam->dma_num].in.conf0.in_rst = 0;
 
     LCD_CAM.cam_ctrl1.cam_rec_data_bytelen = cam->dma_half_buffer_size - 1; // Ping pong operation
 
     if (!cam->psram_mode) {
-        GDMA.in[cam->dma_num].link.addr = ((uint32_t)&cam->dma[0]) & 0xfffff;
+        GDMA.channel[cam->dma_num].in.link.addr = ((uint32_t)&cam->dma[0]) & 0xfffff;
     } else {
-        GDMA.in[cam->dma_num].link.addr = ((uint32_t)&cam->frames[frame_pos].dma[0]) & 0xfffff;
+        GDMA.channel[cam->dma_num].in.link.addr = ((uint32_t)&cam->frames[frame_pos].dma[0]) & 0xfffff;
     }
 
-    GDMA.in[cam->dma_num].link.start = 1;
+    GDMA.channel[cam->dma_num].in.link.start = 1;
 
     LCD_CAM.cam_ctrl.cam_update = 1;
     LCD_CAM.cam_ctrl1.cam_start = 1;
@@ -110,16 +124,15 @@ bool ll_cam_start(cam_obj_t *cam, int frame_pos)
 
 static esp_err_t ll_cam_dma_init(cam_obj_t *cam)
 {
-	#define LCD_CAM_DMA_MAX_NUM               (5) // Maximum number of DMA channels
-    for (int x = (LCD_CAM_DMA_MAX_NUM - 1); x >= 0; x--) {
-        if (GDMA.out[x].link.addr == 0x0 && GDMA.in[x].link.addr == 0x0) {
+    for (int x = (SOC_GDMA_PAIRS_PER_GROUP - 1); x >= 0; x--) {
+        if (GDMA.channel[x].in.link.addr == 0x0) {
             cam->dma_num = x;
-            ESP_LOGI(TAG, "dma_num=%d", cam->dma_num);
+            ESP_LOGI(TAG, "DMA Channel=%d", cam->dma_num);
             break;
         }
         if (x == 0) {
             cam_deinit();
-            ESP_LOGE(TAG, "DMA error");
+            ESP_LOGE(TAG, "Can't found available GDMA channel");
 			return ESP_FAIL;
         }
     }
@@ -131,25 +144,25 @@ static esp_err_t ll_cam_dma_init(cam_obj_t *cam)
         REG_CLR_BIT(SYSTEM_PERIP_RST_EN1_REG, SYSTEM_DMA_RST);
     }
 
-    GDMA.in[cam->dma_num].int_clr.val = ~0;
-    GDMA.in[cam->dma_num].int_ena.val = 0;
+    GDMA.channel[cam->dma_num].in.int_clr.val = ~0;
+    GDMA.channel[cam->dma_num].in.int_ena.val = 0;
 
-    GDMA.in[cam->dma_num].conf0.val = 0;
-    GDMA.in[cam->dma_num].conf0.in_rst = 1;
-    GDMA.in[cam->dma_num].conf0.in_rst = 0;
+    GDMA.channel[cam->dma_num].in.conf0.val = 0;
+    GDMA.channel[cam->dma_num].in.conf0.in_rst = 1;
+    GDMA.channel[cam->dma_num].in.conf0.in_rst = 0;
 
     //internal SRAM only
     if (!cam->psram_mode) {
-        GDMA.in[cam->dma_num].conf0.indscr_burst_en = 1;
-        GDMA.in[cam->dma_num].conf0.in_data_burst_en = 1;
+        GDMA.channel[cam->dma_num].in.conf0.indscr_burst_en = 1;
+        GDMA.channel[cam->dma_num].in.conf0.in_data_burst_en = 1;
     }
 
-    GDMA.in[cam->dma_num].conf1.in_check_owner = 0;
+    GDMA.channel[cam->dma_num].in.conf1.in_check_owner = 0;
 
-    GDMA.in[cam->dma_num].peri_sel.sel = 5;
-    //GDMA.in[cam->dma_num].pri.rx_pri = 1;//rx prio 0-15
-    //GDMA.in[cam->dma_num].sram_size.in_size = 6;//This register is used to configure the size of L2 Tx FIFO for Rx channel. 0:16 bytes, 1:24 bytes, 2:32 bytes, 3: 40 bytes, 4: 48 bytes, 5:56 bytes, 6: 64 bytes, 7: 72 bytes, 8: 80 bytes.
-    //GDMA.in[cam->dma_num].wight.rx_weight = 7;//The weight of Rx channel 0-15
+    GDMA.channel[cam->dma_num].in.peri_sel.sel = 5;
+    //GDMA.channel[cam->dma_num].in.pri.rx_pri = 1;//rx prio 0-15
+    //GDMA.channel[cam->dma_num].in.sram_size.in_size = 6;//This register is used to configure the size of L2 Tx FIFO for Rx channel. 0:16 bytes, 1:24 bytes, 2:32 bytes, 3: 40 bytes, 4: 48 bytes, 5:56 bytes, 6: 64 bytes, 7: 72 bytes, 8: 80 bytes.
+    //GDMA.channel[cam->dma_num].in.wight.rx_weight = 7;//The weight of Rx channel 0-15
     return ESP_OK;
 }
 
@@ -251,6 +264,7 @@ esp_err_t ll_cam_init_isr(cam_obj_t *cam)
 	esp_err_t ret = ESP_OK;
 	ret = esp_intr_alloc((ETS_DMA_IN_CH0_INTR_SOURCE + cam->dma_num), ESP_INTR_FLAG_LOWMED | ESP_INTR_FLAG_IRAM, ll_cam_dma_isr, cam, &cam->dma_intr_handle);
 	if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "DMA interrupt allocation of camera failed");
 		return ret;
 	}
 	return esp_intr_alloc(ETS_LCD_CAM_INTR_SOURCE, ESP_INTR_FLAG_LOWMED | ESP_INTR_FLAG_IRAM, ll_cam_vsync_isr, cam, &cam->cam_intr_handle);
@@ -265,10 +279,10 @@ void ll_cam_do_vsync(cam_obj_t *cam)
 
 uint8_t ll_cam_get_dma_align(cam_obj_t *cam)
 {
-    return 64;//16 << GDMA.in[cam->dma_num].conf1.in_ext_mem_bk_size;
+    return 16 << GDMA.channel[cam->dma_num].in.conf1.in_ext_mem_bk_size;
 }
 
-static void ll_cam_calc_rgb_dma(cam_obj_t *cam){
+static bool ll_cam_calc_rgb_dma(cam_obj_t *cam){
     size_t node_max = LCD_CAM_DMA_NODE_BUFFER_MAX_SIZE / cam->dma_bytes_per_item;
     size_t line_width = cam->width * cam->in_bytes_per_pixel;
     size_t node_size = node_max;
@@ -308,7 +322,7 @@ static void ll_cam_calc_rgb_dma(cam_obj_t *cam){
     size_t dma_half_buffer_max = 16 * 1024 / cam->dma_bytes_per_item;
     if (line_width > dma_half_buffer_max) {
         ESP_LOGE(TAG, "Resolution too high");
-        return;
+        return 0;
     }
 
     // Calculate minimum EOF size = max(mode_size, line_size)
@@ -340,9 +354,10 @@ static void ll_cam_calc_rgb_dma(cam_obj_t *cam){
     cam->dma_buffer_size = dma_buffer_size * cam->dma_bytes_per_item;
     cam->dma_half_buffer_size = dma_half_buffer * cam->dma_bytes_per_item;
     cam->dma_half_buffer_cnt = cam->dma_buffer_size / cam->dma_half_buffer_size;
+    return 1;
 }
 
-void ll_cam_dma_sizes(cam_obj_t *cam)
+bool ll_cam_dma_sizes(cam_obj_t *cam)
 {
     cam->dma_bytes_per_item = 1;
     if (cam->jpeg_mode) {
@@ -358,17 +373,18 @@ void ll_cam_dma_sizes(cam_obj_t *cam)
             cam->dma_node_buffer_size = cam->dma_half_buffer_size;
         }
     } else {
-        ll_cam_calc_rgb_dma(cam);
+        return ll_cam_calc_rgb_dma(cam);
     }
+    return 1;
 }
 
-size_t ll_cam_memcpy(uint8_t *out, const uint8_t *in, size_t len)
+size_t IRAM_ATTR ll_cam_memcpy(uint8_t *out, const uint8_t *in, size_t len)
 {
     memcpy(out, in, len);
     return len;
 }
 
-esp_err_t ll_cam_set_sample_mode(cam_obj_t *cam, pixformat_t pix_format, uint32_t xclk_freq_hz, uint8_t sensor_pid)
+esp_err_t  ll_cam_set_sample_mode(cam_obj_t *cam, pixformat_t pix_format, uint32_t xclk_freq_hz, uint16_t sensor_pid)
 {
     if (pix_format == PIXFORMAT_GRAYSCALE) {
         if (sensor_pid == OV3660_PID || sensor_pid == OV5640_PID || sensor_pid == NT99141_PID) {
@@ -381,10 +397,6 @@ esp_err_t ll_cam_set_sample_mode(cam_obj_t *cam, pixformat_t pix_format, uint32_
             cam->in_bytes_per_pixel = 2;       // camera sends YU/YV
             cam->fb_bytes_per_pixel = 2;       // frame buffer stores YU/YV/RGB565
     } else if (pix_format == PIXFORMAT_JPEG) {
-        if (sensor_pid != OV2640_PID && sensor_pid != OV3660_PID && sensor_pid != OV5640_PID  && sensor_pid != NT99141_PID) {
-            ESP_LOGE(TAG, "JPEG format is not supported on this sensor");
-            return ESP_ERR_NOT_SUPPORTED;
-        }
         cam->in_bytes_per_pixel = 1;
         cam->fb_bytes_per_pixel = 1;
     } else {
