@@ -153,6 +153,15 @@ static const DRAM_ATTR uint8_t sensor_framesize_QVGA_regs[][2] =
     { 0x03, 0x00 }, /* VHREF */
 };
 
+static const DRAM_ATTR uint8_t sensor_framesize_HVGA_regs[][2] =
+{
+    { 0x17, 0x00 }, /* HSTART */
+    { 0x18, 0x78 }, /* HSTOP */
+    { 0x19, 0x00 }, /* VSTART */
+    { 0x1a, 0x50 }, /* VSTOP */
+    { 0x03, 0x00 }, /* VHREF */
+};
+
 static const DRAM_ATTR uint8_t sensor_framesize_VGA_regs[][2] =
 {
     { 0x17, 0x00 },

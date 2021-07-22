@@ -117,6 +117,11 @@ static int set_framesize(sensor_t *sensor, framesize_t framesize)
                 SCCB_Write(sensor->slv_addr, sensor_framesize_QVGA_regs[i][0], sensor_framesize_QVGA_regs[i][1]);
             }
             break;
+        case FRAMESIZE_HVGA:
+            for (int i = 0; i < sizeof(sensor_framesize_HVGA_regs) / 2; i++) {
+                SCCB_Write(sensor->slv_addr, sensor_framesize_HVGA_regs[i][0], sensor_framesize_HVGA_regs[i][1]);
+            }
+            break;
         case FRAMESIZE_VGA:
             for (int i = 0; i < sizeof(sensor_framesize_VGA_regs) / 2; i++) {
                 SCCB_Write(sensor->slv_addr, sensor_framesize_VGA_regs[i][0], sensor_framesize_VGA_regs[i][1]);
