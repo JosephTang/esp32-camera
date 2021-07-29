@@ -117,6 +117,11 @@ typedef struct {
     camera_grab_mode_t grab_mode;   /*!< When buffers should be filled */
 
     bool psram_mode;                /*!< enable PSRAM mode */
+    enum {
+        CONV_DISABLE,
+        TO_YUV422,
+        TO_YUV420
+    } conv_mode;
 } camera_config_t;
 
 /**

@@ -158,6 +158,7 @@ static esp_err_t ll_cam_dma_init(cam_obj_t *cam)
     }
 
     GDMA.channel[cam->dma_num].in.conf1.in_check_owner = 0;
+    GDMA.channel[cam->dma_num].in.conf1.in_ext_mem_bk_size = 2;
 
     GDMA.channel[cam->dma_num].in.peri_sel.sel = 5;
     //GDMA.channel[cam->dma_num].in.pri.rx_pri = 1;//rx prio 0-15
@@ -202,7 +203,15 @@ esp_err_t ll_cam_config(cam_obj_t *cam, const camera_config_t *config)
     LCD_CAM.cam_ctrl1.cam_vh_de_mode_en = 0;
 
     LCD_CAM.cam_rgb_yuv.val = 0;
-
+    if (config->conv_mode == TO_YUV420) {
+        if (config->pixel_format != PIXFORMAT_YUV422) {
+            ESP_LOGE(TAG, "Not support format for LCD CAM Conv");
+        } else {
+            LCD_CAM.cam_rgb_yuv.cam_conv_trans_mode = 1;
+            LCD_CAM.cam_rgb_yuv.cam_conv_yuv_mode = 0;
+            LCD_CAM.cam_rgb_yuv.cam_conv_yuv2yuv_mode = 1;
+        }
+    }
     LCD_CAM.cam_ctrl.cam_update = 1;
     LCD_CAM.cam_ctrl1.cam_start = 1;
 
