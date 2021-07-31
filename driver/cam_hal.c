@@ -145,12 +145,14 @@ static void cam_task(void *arg)
                     }
 
                     if (cam_obj->recv_mode == RECEIVE_CHUNKED_WITH_DRAM) {
+                        DBG_PIN_SET(DBG_PIN_IO0, 1);
                         int ret = jpeg_enc_process_with_block(cam_obj->jpeg_encoder,
                                         &cam_obj->dma_buffer[(cnt % cam_obj->dma_half_buffer_cnt) * cam_obj->dma_half_buffer_size],
                                         cam_obj->dma_half_buffer_size,
                                         frame_buffer_event->buf,
                                         cam_obj->recv_size,
                                         (int *)&frame_buffer_event->len);
+                        DBG_PIN_SET(DBG_PIN_IO0, 0);
                     }
                     cnt++;
                 } else if (cam_event == CAM_VSYNC_EVENT) {
@@ -264,7 +266,7 @@ static esp_err_t cam_dma_config()
         cam_obj->frames[x].fb_offset = 0;
         cam_obj->frames[x].en = 0;
         if (cam_obj->recv_mode == RECEIVE_CHUNKED_WITH_DRAM) {
-            cam_obj->frames[x].fb.buf = (uint8_t *)heap_caps_malloc(cam_obj->recv_size * sizeof(uint8_t), MALLOC_CAP_INTERNAL);
+            cam_obj->frames[x].fb.buf = (uint8_t *)heap_caps_malloc(cam_obj->recv_size * sizeof(uint8_t) + dma_align, MALLOC_CAP_SPIRAM);
         } else {
             cam_obj->frames[x].fb.buf = (uint8_t *)heap_caps_malloc(cam_obj->recv_size * sizeof(uint8_t) + dma_align, MALLOC_CAP_SPIRAM);
         }

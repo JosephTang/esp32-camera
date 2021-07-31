@@ -126,13 +126,13 @@ typedef struct {
     size_t fb_count;                /*!< Number of frame buffers to be allocated. If more than one, then each frame will be acquired (double speed)  */
     camera_grab_mode_t grab_mode;   /*!< When buffers should be filled */
 
+    cam_receive_mode_t recv_mode;   /*!< receive mode */
+    jpeg_enc_info_t *jpeg_enc_cfg;  /*!< configuration for jpeg encoder */
     enum {
         CONV_DISABLE,
         TO_YUV422,
         TO_YUV420
     } conv_mode;
-    cam_receive_mode_t recv_mode;   /*!< receive mode */
-    jpeg_enc_info_t *jpeg_enc_cfg;  /*!< configuration for jpeg encoder */
 } camera_config_t;
 
 /**

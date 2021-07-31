@@ -9,7 +9,7 @@ typedef enum {
     JPEG_SUB_SAMPLE_Y = 0,    /*!< Grayscale */
     JPEG_SUB_SAMPLE_YUV = 1,  /*!< YCbCr 1x1x1   3 pixel per MCU  Y444*/
     JPEG_SUB_SAMPLE_YUYV = 2, /*!< YCbYCr 2x1x1  2 pixel per MCU  Y422*/
-    JPEG_SUB_SAMPLE_YYUV = 3  /*!< YYCbCr 4x1x1  1.25 pixel per MCU  Y420)*/
+    JPEG_SUB_SAMPLE_YYYYUV = 3  /*!< YYCbCr 4x1x1  1.25 pixel per MCU  Y420)*/
 } jpeg_enc_subsampling_t;
 
 /* input stream type */
@@ -26,7 +26,7 @@ typedef struct jpeg_info {
     int height;                         /*!< Image height */
     jpeg_enc_src_type_t src_type;       /*!< Input image type */
     jpeg_enc_subsampling_t subsampling; /*!< JPEG chroma subsampling factors.*/
-    uint8_t quality;                      /*!< Quality: 1-100, higher is better. Typical values are around 40 - 100. */
+    uint8_t quality;                    /*!< Quality: 1-100, higher is better. Typical values are around 40 - 100. */
     uint8_t hfm_task_priority;
     uint8_t hfm_task_core;
 } jpeg_enc_info_t;
