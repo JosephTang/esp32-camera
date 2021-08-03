@@ -284,6 +284,7 @@ esp_err_t cam_init(const camera_config_t *config)
     cam_obj->swap_data = 0;
     cam_obj->vsync_pin = config->pin_vsync;
     cam_obj->vsync_invert = true;
+    cam_obj->conv_mode = config->conv_mode;
 
     ll_cam_set_pin(cam_obj, config);
     ret = ll_cam_config(cam_obj, config);
@@ -324,7 +325,10 @@ esp_err_t cam_config(const camera_config_t *config, framesize_t frame_size, uint
     if(cam_obj->jpeg_mode){
         cam_obj->recv_size = cam_obj->width * cam_obj->height / 5;
     } else {
-        cam_obj->recv_size = cam_obj->width * cam_obj->height * 2;
+        if (cam_obj->conv_mode == TO_YUV420)
+            cam_obj->recv_size = cam_obj->width * cam_obj->height * 1.5;
+        else
+            cam_obj->recv_size = cam_obj->width * cam_obj->height * 2;
     }
 
     ret = cam_dma_config();
